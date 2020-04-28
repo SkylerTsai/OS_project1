@@ -10,9 +10,12 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
-#define PMAX       16
-#define RRTQ      500
-#define get_time  333
+#define PMAX       16  /* process number maximun    */
+#define RRTQ      500  /* RR time quantum           */
+#define PCPU        0  /* Parent CPU                */
+#define CCPU        1  /* Child CPU                 */
+#define get_time  333  /* system call for get_time  */
+#define printk    334  /* system call for p1_printk */
 #define FIFO        1
 #define RR          2
 #define SJF         3
@@ -21,7 +24,6 @@
 void unit_of_time(){
 	volatile unsigned long i;
 	for(i = 0; i < 1000000UL; i++);
-
 	return;
 }
 
@@ -31,6 +33,14 @@ typedef struct process{
 	int exec;
 	pid_t pid;
 } Process;
+
+void CPU_assigning(int pid, int CPU){
+	cpu_set_t mask;
+	CPU_ZERO(&mask);
+	CPU_SET(CPU, &mask);
+
+	sched_setaffinity(pid, sizeof(cpu_set_t), &mask);
+}
 
 void block_process(int pid){
 	struct sched_param param;
@@ -55,21 +65,19 @@ void exec_process(Process *p){
 		p->pid = getpid();
 		fprintf(stdout, "%s %d\n", p->name, p->pid);
 		
-		struct timespec start, end;
-//		syscall(get_time, &start);
+		struct timespec s, e;
+//		syscall(get_time, &s);
 		for(int i = 0; i < p->exec; i++){
 			unit_of_time();
-//			fprintf(stdout, "Run %s\n", p->name);
+			fprintf(stdout, "Run %s\n", p->name);
 		}
-//		syscall(get_time, &end);
-
-//		char dmesg[128];
-//		sprintf(dmesg, "[Project1] %d %lu.%09lu %lu.%09lu\n", p->pid, s_sec, s_nsec, e_sec, e_nsec);
+//		syscall(get_time, &e);
 	
-//		fprintf(stderr, "%s\n", dmesg);
+//		syscall(printk, s.tv_sec, s.tv_nsec, e.tv_sec, e.tv_nsec);
 
 		exit(0);
 	}
+	else CPU_assigning(p->pid, CCPU);
 	
 	return;
 }
@@ -134,6 +142,7 @@ void schedule(int s_type, Process P[], int p_num){
 	queue[p_num] = p_num;
 
 	wake_process(getpid());
+	CPU_assigning(getpid(), PCPU);
 
 	while(1){
 		if(p_now != -1 && P[p_now].exec == 0){
