@@ -35,17 +35,25 @@ typedef struct process{
 } Process;
 
 void CPU_assigning(int pid, int CPU){
+	if(CPU > sizeof(cpu_set_t)) fprintf(stderr, "CPU exceed\n");
 	cpu_set_t mask;
 	CPU_ZERO(&mask);
 	CPU_SET(CPU, &mask);
 
-	sched_setaffinity(pid, sizeof(cpu_set_t), &mask);
+	if(sched_setaffinity(pid, sizeof(cpu_set_t), &mask) < 0){
+		fprintf(stderr, "setaffinity failed\n");
+	}
+
+	return;
 }
 
 void block_process(int pid){
 	struct sched_param param;
 	param.sched_priority = 0;
-	sched_setscheduler(pid, SCHED_IDLE, &param);
+	if(sched_setscheduler(pid, SCHED_IDLE, &param) < 0){
+		fprintf(stderr, "%d block failed\n", pid);
+	}
+//	else fprintf(stdout, "%d blocked\n", pid);
 
 	return;
 }
@@ -53,7 +61,13 @@ void block_process(int pid){
 void wake_process(int pid){
 	struct sched_param param;
 	param.sched_priority = 0;
-	sched_setscheduler(pid, SCHED_OTHER, &param);
+	if(sched_setscheduler(pid, SCHED_OTHER, &param) < 0){
+		fprintf(stderr, "%d wake failed\n", pid);
+	}
+	else{
+//		setpriority(PRIO_PROCESS, pid, 0);
+//		fprintf(stdout, "%d wake\n", pid);
+	}
 
 	return;
 }
@@ -63,21 +77,23 @@ void exec_process(Process *p){
 
 	if(p->pid == 0){
 		p->pid = getpid();
-		fprintf(stdout, "%s %d\n", p->name, p->pid);
+//		fprintf(stdout, "%s %d\n", p->name, p->pid);
 		
 		struct timespec s, e;
 //		syscall(get_time, &s);
 		for(int i = 0; i < p->exec; i++){
 			unit_of_time();
-			fprintf(stdout, "Run %s\n", p->name);
+//			fprintf(stdout, ">>>>> Run %d\n", p->pid);
 		}
 //		syscall(get_time, &e);
+//		fprintf(stdout, "start %lu.%lu end %lu.%lu\n", s.tv_sec, s.tv_nsec, e.tv_sec, e.tv_nsec);
 	
-//		syscall(printk, s.tv_sec, s.tv_nsec, e.tv_sec, e.tv_nsec);
+//		syscall(printk, p->pid, s.tv_sec, s.tv_nsec, e.tv_sec, e.tv_nsec);
 
 		exit(0);
 	}
-	else CPU_assigning(p->pid, CCPU);
+
+	CPU_assigning(p->pid, CCPU);
 	
 	return;
 }
@@ -141,8 +157,8 @@ void schedule(int s_type, Process P[], int p_num){
 	for(int i = 0; i < p_num; i++) queue[i] = -1;
 	queue[p_num] = p_num;
 
-	wake_process(getpid());
 	CPU_assigning(getpid(), PCPU);
+	wake_process(getpid());
 
 	while(1){
 		if(p_now != -1 && P[p_now].exec == 0){
@@ -157,6 +173,7 @@ void schedule(int s_type, Process P[], int p_num){
 		for(int i = 0; i < p_num; i++){
 			if(P[i].ready == time_now){
 				exec_process(&P[i]);
+				fprintf(stdout, "%s is ready, pid = %d\n", P[i].name, P[i].pid);
 				block_process(P[i].pid);
 				if(s_type == RR) queue_push(queue, q_now, p_num, i);
 			}
@@ -169,24 +186,20 @@ void schedule(int s_type, Process P[], int p_num){
 		}
 		else next = find_next(s_type, P, p_num, p_now);
 
-		fprintf(stdout, "%d ", time_now);
-		
-		if(next == p_num) break;
-		else if(next == -1) fprintf(stdout, "No process\n");
-		else if(p_now != next){
-			block_process(P[p_now].pid);
+		if(next == p_num) break; /* Finish */
+		else if(next != -1 && p_now != next){
+			wake_process(P[next].pid);
+			if(p_now != -1) block_process(P[p_now].pid);
 			p_now = next, last_switch = time_now;
-			wake_process(P[p_now].pid);
 		}
 
-		unit_of_time();
+		unit_of_time(), time_now++;
 
 		if(p_now != -1){
 			P[p_now].exec--;
-			fprintf(stdout, "%s left %d\n", P[p_now].name, P[p_now].exec);
+//			fprintf(stdout, "%s left %d\n", P[p_now].name, P[p_now].exec);
 		}
-		
-		time_now++;
+//		else fprintf(stdout, "No process\n");
 	}
 
 	return;
@@ -195,8 +208,6 @@ void schedule(int s_type, Process P[], int p_num){
 int main(){
 	char policy[8] = {};
 	int p_num = 0, s_type = 0;
-
-	setpriority(PRIO_PROCESS, getpid(), 1);
 	
 	scanf("%s %d", policy, &p_num);
 
