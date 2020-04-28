@@ -53,7 +53,9 @@ void block_process(int pid){
 	if(sched_setscheduler(pid, SCHED_IDLE, &param) < 0){
 		fprintf(stderr, "%d block failed\n", pid);
 	}
-//	else fprintf(stdout, "%d blocked\n", pid);
+#ifdef DEBUG
+	else fprintf(stdout, "%d blocked\n", pid);
+#endif
 
 	return;
 }
@@ -64,10 +66,9 @@ void wake_process(int pid){
 	if(sched_setscheduler(pid, SCHED_OTHER, &param) < 0){
 		fprintf(stderr, "%d wake failed\n", pid);
 	}
-	else{
-//		setpriority(PRIO_PROCESS, pid, 0);
-//		fprintf(stdout, "%d wake\n", pid);
-	}
+#ifdef DEBUG
+	else fprintf(stdout, "%d wake\n", pid);
+#endif
 
 	return;
 }
@@ -77,18 +78,24 @@ void exec_process(Process *p){
 
 	if(p->pid == 0){
 		p->pid = getpid();
-//		fprintf(stdout, "%s %d\n", p->name, p->pid);
-		
+#ifndef DEBUG 
+		fprintf(stdout, "%s %d\n", p->name, p->pid);
+#endif		
+
 		struct timespec s, e;
-//		syscall(get_time, &s);
+		syscall(get_time, &s);
 		for(int i = 0; i < p->exec; i++){
 			unit_of_time();
-//			fprintf(stdout, ">>>>> Run %d\n", p->pid);
+#ifdef DEBUG
+			fprintf(stdout, ">>>>> Run %d\n", p->pid);
+#endif
 		}
-//		syscall(get_time, &e);
-//		fprintf(stdout, "start %lu.%lu end %lu.%lu\n", s.tv_sec, s.tv_nsec, e.tv_sec, e.tv_nsec);
-	
-//		syscall(printk, p->pid, s.tv_sec, s.tv_nsec, e.tv_sec, e.tv_nsec);
+		syscall(get_time, &e);
+
+#ifdef DEBUG
+		fprintf(stdout, "start %lu.%lu end %lu.%lu\n", s.tv_sec, s.tv_nsec, e.tv_sec, e.tv_nsec);
+#endif
+		syscall(printk, p->pid, s.tv_sec, s.tv_nsec, e.tv_sec, e.tv_nsec);
 
 		exit(0);
 	}
@@ -161,6 +168,9 @@ void schedule(int s_type, Process P[], int p_num){
 	wake_process(getpid());
 
 	while(1){
+#ifdef DEBUG
+		fprintf(stdout, "Time %d\n", time_now);
+#endif
 		if(p_now != -1 && P[p_now].exec == 0){
 			waitpid(P[p_now].pid, NULL, 0);
 			p_now = -1;
@@ -173,7 +183,9 @@ void schedule(int s_type, Process P[], int p_num){
 		for(int i = 0; i < p_num; i++){
 			if(P[i].ready == time_now){
 				exec_process(&P[i]);
+#ifdef DEBUG
 				fprintf(stdout, "%s is ready, pid = %d\n", P[i].name, P[i].pid);
+#endif
 				block_process(P[i].pid);
 				if(s_type == RR) queue_push(queue, q_now, p_num, i);
 			}
@@ -197,9 +209,13 @@ void schedule(int s_type, Process P[], int p_num){
 
 		if(p_now != -1){
 			P[p_now].exec--;
-//			fprintf(stdout, "%s left %d\n", P[p_now].name, P[p_now].exec);
+#ifdef DEBUG
+			fprintf(stdout, "%s left %d\n", P[p_now].name, P[p_now].exec);
+#endif
 		}
-//		else fprintf(stdout, "No process\n");
+#ifdef DEBUG
+		else fprintf(stdout, "No process\n");
+#endif
 	}
 
 	return;
