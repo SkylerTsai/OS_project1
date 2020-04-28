@@ -4,9 +4,10 @@ all:
 	gcc main.c -o main.o
 
 run:
-#	sudo dmesg clean
+	gcc main.c -o main.o
+	sudo dmesg --clear
 	sudo ./main.o < $(file).txt 1> $(file)_stdout.txt
-	dmesg | grep Project1 > $(file)_dmesg.txt
+	dmesg | grep project1 > $(file)_dmesg.txt
 
 debug:
 	gcc main.c -DDEBUG -o main.o

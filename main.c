@@ -125,14 +125,17 @@ void queue_push(int queue[], int q_now, int p_num, int p){
 	for(int i = q_now; ; i = (i+1)%p_num){
 		if(queue[i] == -1){
 			queue[i] = p;
+#ifdef DEBUG
+			fprintf(stdout, "%d put in %d\n", p, i);
+#endif
 			break;
 		}
 	}
 	return;
 }
 
-int queue_pop(Process P[], int p_num, int queue[], int q_now, int period){
-	if(period % RRTQ == 0){
+int queue_pop(Process P[], int p_num, int queue[], int q_now, int time, int last_switch){
+	if(time != 0 && (time -last_switch) % RRTQ == 0){
 		int p = queue[q_now];
 		queue[q_now] = -1, q_now = (q_now+1)%p_num;
 		queue_push(queue, q_now, p_num, p);
@@ -150,7 +153,10 @@ int queue_pop(Process P[], int p_num, int queue[], int q_now, int period){
 			for(int i = 0; i < p_num; i++){
 				if(P[i].exec == 0) fin++;
 			}
-			if(fin == p_num) q_now == p_num;
+			if(fin == p_num) q_now = p_num;
+#ifdef DEBUG
+			fprintf(stdout, "fin %d\n", fin);
+#endif
 		}
 	}
 	
@@ -162,7 +168,6 @@ void schedule(int s_type, Process P[], int p_num){
 	int queue[PMAX], q_now = 0, last_switch = 0;
 
 	for(int i = 0; i < p_num; i++) queue[i] = -1;
-	queue[p_num] = p_num;
 
 	CPU_assigning(getpid(), PCPU);
 	wake_process(getpid());
@@ -174,10 +179,7 @@ void schedule(int s_type, Process P[], int p_num){
 		if(p_now != -1 && P[p_now].exec == 0){
 			waitpid(P[p_now].pid, NULL, 0);
 			p_now = -1;
-			if(s_type == RR){
-				queue[q_now] = -1;
-				q_now = (q_now+1)%p_num;
-			}
+			if(s_type == RR) queue[q_now] = -1;
 		}
 
 		for(int i = 0; i < p_num; i++){
@@ -193,8 +195,9 @@ void schedule(int s_type, Process P[], int p_num){
 
 		int next = -1;
 		if(s_type == RR){
-			q_now = queue_pop(P, p_num, queue, q_now, time_now - last_switch);
-			next = queue[q_now];
+			q_now = queue_pop(P, p_num, queue, q_now, time_now, last_switch);
+			if(q_now == p_num) next = p_num;
+			else next = queue[q_now];
 		}
 		else next = find_next(s_type, P, p_num, p_now);
 
