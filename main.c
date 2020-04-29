@@ -10,7 +10,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
-#define PMAX       16  /* process number maximun    */
+#define PMAX       32  /* process number maximun    */
 #define RRTQ      500  /* RR time quantum           */
 #define PCPU        0  /* Parent CPU                */
 #define CCPU        1  /* Child CPU                 */
